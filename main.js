@@ -106,19 +106,19 @@ async function checkActiveGame(puuid) {
 			console.log(clc.green(`${now} --- ${riotId} in game`));
 		}
 	} catch (error) {
+		const user_response = await axios.get(
+			`https://asia.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
+			{
+				headers: { 'X-Riot-Token': RIOT_API_KEY },
+			}
+		);
+		const userInfo = user_response.data;
+		const riotId = `${userInfo.gameName}#${userInfo.tagLine}`;
+		const timestamp = moment().format('MMM d YYYY, HH:mm:ss');
 		if (error.response && error.response.status == 404) {
-			const user_response = await axios.get(
-				`https://asia.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
-				{
-					headers: { 'X-Riot-Token': RIOT_API_KEY },
-				}
-			);
-			const userInfo = user_response.data;
-			riotId = `${userInfo.gameName}#${userInfo.tagLine}`;
-			const timestamp = moment().format('MMM d YYYY, HH:mm:ss');
 			console.log(`${timestamp} --- ${riotId} not in game`);
 		} else {
-			console.error(clc.red(`Error for ${riotId}:`, error.message));
+			console.error(clc.red(`${timestamp} --- Error for ${riotId}:`, error.message));
 		}
 	}
 }
