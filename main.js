@@ -1,5 +1,5 @@
 const axios = require('axios');
-const moment = require('moment');
+const moment = require('moment-timezone');
 const clc = require('cli-color');
 const cron = require('node-cron');
 
@@ -85,7 +85,10 @@ async function checkActiveGame(puuid) {
 			const gameLenFormatted = `${gameLenMinutes.toString().padStart(2, '0')}:${gameLenSeconds
 				.toString()
 				.padStart(2, '0')}`;
-			const startTime = moment(gameInfo.gameStartTime).format('YYYY-MM-DD HH:mm:ss');
+			const startTime = moment(gameInfo.gameStartTime)
+				.tz('Asia/Ho_Chi_Minh')
+				.locale('vi')
+				.format('YYYY-MM-DD HH:mm:ss');
 
 			const { img_url, color } = setImgAndColorByMode(gameInfo.gameMode);
 			const data = {
@@ -165,8 +168,8 @@ const checkAllAccounts = () => {
 	});
 };
 
-//  Lập lịch kiểm tra mỗi 5 phút
-cron.schedule('*/1 * * * *', () => {
+//  Lập lịch kiểm tra mỗi 2 phút
+cron.schedule('*/2 * * * *', () => {
 	const now = moment().format('MMM d YYYY, HH:mm:ss');
 	console.log(`~~~~~~~~~~~ ${now} ~~~~~~~~~~`);
 	checkAllAccounts();
