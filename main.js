@@ -44,6 +44,8 @@ async function sendDiscordMessage(data) {
 }
 
 const setImgAndColorByMode = (gameMode) => {
+	let img_url = '';
+	let color = '';
 	if (gameMode == 'ULTBOOK') {
 		img_url =
 			'https://support-leagueoflegends.riotgames.com/hc/article_attachments/7395520405011/ultimate-spellbook-icon.png';
@@ -195,7 +197,7 @@ async function checkActiveGame(puuid) {
 					}
 				}
 			}
-		} else if (error.response && (error.response.status === 403 || error.response.status === 401)) {
+		} else if (error.response && (error.response.status == 403 || error.response.status == 401)) {
 			const warningMessage = {
 				content:
 					'⚠️ **CẢNH BÁO**: Riot API key đã hết hạn!\nVui lòng tạo key mới tại: https://developer.riotgames.com/',
