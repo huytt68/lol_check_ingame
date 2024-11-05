@@ -113,6 +113,7 @@ async function checkActiveGame(puuid) {
 				.tz('Asia/Ho_Chi_Minh')
 				.locale('vi')
 				.format('YYYY-MM-DD HH:mm:ss');
+
 			const { img_url, color } = setImgAndColorByMode(gameInfo.gameMode);
 			const timestamp = new Date().toISOString();
 			const data = {
