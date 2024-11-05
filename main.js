@@ -2,11 +2,13 @@ const axios = require('axios');
 const moment = require('moment-timezone');
 const clc = require('cli-color');
 const cron = require('node-cron');
-
 require('dotenv').config();
+const championsData = require('./champion-summary.js');
+const queueData = require('./queues.js');
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+const NOTI_WEBHOOK_URL = process.env.NOTI_WEBHOOK_URL;
 
 // Thay thế PUUID đơn lẻ bằng mảng các PUUID
 const PUUIDS = [
@@ -23,6 +25,14 @@ const PUUIDS = [
 	'vlJzxNCdhjYDvadtKmAXh-O9-4N5IE-KP6ItgkPkHAffnGb6NP17loR-b5VJHgjejtqlZCArJC_PpQ', //cutu
 ];
 let activeMatches = {};
+
+const getChampionInfo = (championId) => {
+	return championsData.find((champion) => champion.id === championId);
+};
+
+const getQueueData = (queueId) => {
+	return queueData.find((queue) => queue.queueId === queueId);
+};
 
 async function sendDiscordMessage(data) {
 	try {
@@ -69,16 +79,30 @@ async function checkActiveGame(puuid) {
 			}
 		);
 		// Nếu có trận đấu, gửi thông báo đến Discord
-		const timestamp = new Date().toISOString();
+
 		if (response.status == 200) {
 			const gameInfo = response.data;
 
+			// get queue data
+			const queueInfo = getQueueData(gameInfo.gameQueueConfigId);
+			const queueMap = queueInfo.map;
+			const queueType = queueInfo.description;
 			// get list players
 			const players = gameInfo.participants;
-			const players_blue = players.slice(0, 5).reduce((string, p) => string + p.riotId + '\n', '');
-			const players_red = players
-				.slice(5, players.length)
-				.reduce((string, p) => string + p.riotId + '\n', '');
+			const players_blue = players.slice(0, 5).reduce((string, p) => {
+				const championInfo = getChampionInfo(p.championId);
+				if (championInfo) {
+					return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+				}
+				return string;
+			}, '');
+			const players_red = players.slice(5, players.length).reduce((string, p) => {
+				const championInfo = getChampionInfo(p.championId);
+				if (championInfo) {
+					return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+				}
+				return string;
+			}, '');
 
 			const gameLenMinutes = Math.floor(gameInfo.gameLength / 60);
 			const gameLenSeconds = gameInfo.gameLength % 60;
@@ -91,11 +115,12 @@ async function checkActiveGame(puuid) {
 				.format('YYYY-MM-DD HH:mm:ss');
 
 			const { img_url, color } = setImgAndColorByMode(gameInfo.gameMode);
+			const timestamp = new Date().toISOString();
 			const data = {
 				embeds: [
 					{
 						title: `${riotId}`,
-						description: `Mode: ${gameInfo.gameMode}\nGameID: ${gameInfo.gameId}`,
+						description: `• GameID: ${gameInfo.gameId}\n• Mode: ${gameInfo.gameMode}\n• Type: ${queueType}\n• Map: ${queueMap}`,
 						color: color,
 						footer: {
 							text: `${startTime} - Ingame: ${gameLenFormatted}`,
@@ -147,13 +172,42 @@ async function checkActiveGame(puuid) {
 				if (activeMatches[matchId].has(puuid)) {
 					activeMatches[matchId].delete(puuid);
 					// Nếu không còn ai trong trận, xóa luôn matchId khỏi activeMatches
+					const timestamp = new Date().toISOString();
 					if (activeMatches[matchId].size === 0) {
-						await sendDiscordMessage({ content: `Trận đấu #${matchId} đã kết thúc!` });
+						await sendDiscordMessage({
+							embeds: [
+								{
+									title: `${riotId}`,
+									description: `GameID: ${matchId}`,
+									color: 6381921,
+									fields: [
+										{
+											name: '<:aukey:847123822003879956> Game has ended!:',
+											value: '',
+											inline: false,
+										},
+									],
+									timestamp: timestamp,
+								},
+							],
+						});
 						delete activeMatches[matchId];
 					}
 				}
 			}
+		} else if (error.response && (error.response.status === 403 || error.response.status === 401)) {
+			const warningMessage = {
+				content:
+					'⚠️ **CẢNH BÁO**: Riot API key đã hết hạn!\nVui lòng tạo key mới tại: https://developer.riotgames.com/',
+			};
+			await axios.post(NOTI_WEBHOOK_URL, warningMessage);
+
+			// log
+			const now = moment().format('MMM d YYYY, HH:mm:ss');
+			console.error(clc.red(`${now} --- API key đã hết hạn!`));
+			return;
 		} else {
+			const now = moment().format('MMM d YYYY, HH:mm:ss');
 			console.error(clc.red(`${now} --- Error for ${riotId}:`, error.message));
 		}
 	}
