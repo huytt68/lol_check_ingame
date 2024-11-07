@@ -25,6 +25,7 @@ const PUUIDS = [
 	'vlJzxNCdhjYDvadtKmAXh-O9-4N5IE-KP6ItgkPkHAffnGb6NP17loR-b5VJHgjejtqlZCArJC_PpQ', //cutu
 ];
 let activeMatches = {};
+let hasError403 = false;
 
 const getChampionInfo = (championId) => {
 	return championsData.find((champion) => champion.id === championId);
@@ -161,15 +162,15 @@ async function checkActiveGame(puuid) {
 			console.log(clc.green(`${now} --- ${riotId} in game`));
 		}
 	} catch (error) {
-		const user_response = await axios.get(
-			`https://asia.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
-			{
-				headers: { 'X-Riot-Token': RIOT_API_KEY },
-			}
-		);
-		const userInfo = user_response.data;
-		const riotId = `${userInfo.gameName}#${userInfo.tagLine}`;
 		if (error.response && error.response.status == 404) {
+			const user_response = await axios.get(
+				`https://asia.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
+				{
+					headers: { 'X-Riot-Token': RIOT_API_KEY },
+				}
+			);
+			const userInfo = user_response.data;
+			const riotId = `${userInfo.gameName}#${userInfo.tagLine}`;
 			for (let matchId in activeMatches) {
 				if (activeMatches[matchId].has(puuid)) {
 					activeMatches[matchId].delete(puuid);
@@ -197,16 +198,22 @@ async function checkActiveGame(puuid) {
 					}
 				}
 			}
-		} else if (error.response && (error.response.status == 403 || error.response.status == 401)) {
-			const warningMessage = {
-				content:
-					'⚠️ **CẢNH BÁO**: Riot API key đã hết hạn!\nVui lòng tạo key mới tại: https://developer.riotgames.com/',
-			};
-			await axios.post(NOTI_WEBHOOK_URL, warningMessage);
+		} else if (error.response && error.response.status == 403) {
+			if (!hasError403) {
+				hasError403 = true;
+				const warningMessage = {
+					content:
+						'⚠️ **CẢNH BÁO**: Riot API key đã hết hạn!\nVui lòng tạo key mới tại: https://developer.riotgames.com/',
+				};
+				await axios.post(NOTI_WEBHOOK_URL, warningMessage);
 
-			// log
-			const now = moment().format('MMM d YYYY, HH:mm:ss');
-			console.error(clc.red(`${now} --- API key đã hết hạn!`));
+				// log
+				const now = moment().format('MMM d YYYY, HH:mm:ss');
+				console.error(clc.red(`${now} --- API key đã hết hạn!`));
+
+				// Dừng chương trình
+				process.exit(1);
+			}
 			return;
 		} else {
 			const now = moment().format('MMM d YYYY, HH:mm:ss');
