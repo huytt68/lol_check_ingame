@@ -1,3 +1,4 @@
+// http://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/vi_vn/v1/champion-summary.json
 module.exports = [
 	{
 		id: -1,
@@ -1103,6 +1104,13 @@ module.exports = [
 		name: 'Yone',
 		alias: 'Yone',
 		squarePortraitPath: '/lol-game-data/assets/v1/champion-icons/777.png',
+		roles: ['fighter', 'assassin'],
+	},
+	{
+		id: 799,
+		name: 'Ambessa',
+		alias: 'Ambessa',
+		squarePortraitPath: '/lol-game-data/assets/v1/champion-icons/799.png',
 		roles: ['fighter', 'assassin'],
 	},
 	{

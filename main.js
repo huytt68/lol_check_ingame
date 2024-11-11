@@ -3,8 +3,8 @@ const moment = require('moment-timezone');
 const clc = require('cli-color');
 const cron = require('node-cron');
 require('dotenv').config();
-const championsData = require('./champion-summary.js');
-const queueData = require('./queues.js');
+const championsData = require('./data/champions.js');
+const queueData = require('./data/queues.js');
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
@@ -13,7 +13,7 @@ const NOTI_WEBHOOK_URL = process.env.NOTI_WEBHOOK_URL;
 // Thay thế PUUID đơn lẻ bằng mảng các PUUID
 const PUUIDS = [
 	'kDCBiPhDSjRRcynFvWvIDJ0DcDOibp96iVs0p_YHyQMuiXie2cRIpsZQSn5ugzXldIVJRIT3OoByBw', //Canh
-	'A8EPhv7ChKwa3N12oTC2zZ6R-RFe0l3QSC4IaR09ccp6l7leiHuq7vM3cFEXui8zUICX6xC6NIAYvQ', //Acc 2
+	'A8EPhv7ChKwa3N12oTC2zZ6R-RFe0l3QSC4IaR09ccp6l7leiHuq7vM3cFEXui8zUICX6xC6NIAYvQ', //WX-78
 	'5_rMZmg-6iXhmXyt6KDkvlG3fLFBi_cXQzrT6wjTINsDOXttKjGFTLqZ1MCis4Y9hKLeSHTip7BhVQ', //Thanh
 	'g0TrnM_G4cv05AAuUcbZv_Aq5sJVTMD9zqm5rE-qb1gT1V7j9FVGBm9O5mwUCu6pFypoGDPjcqBO2g', //cng
 	'Mf2G9VDyxPNzMWXIFG3XUrZokeb9DnmUJbjU4DaguBwHGQPzfw8UM88ag5XYp2RQ5QCphqFpUINpEg', //Tung
@@ -35,14 +35,14 @@ const getQueueData = (queueId) => {
 	return queueData.find((queue) => queue.queueId === queueId);
 };
 
-async function sendDiscordMessage(data) {
+const sendDiscordMessage = async (data) => {
 	try {
 		await axios.post(DISCORD_WEBHOOK_URL, data);
 		// console.log('Đã gửi thông báo đến Discord:', data);
 	} catch (error) {
 		console.error('Lỗi khi gửi thông báo Discord:', error.message);
 	}
-}
+};
 
 const setImgAndColorByMode = (gameMode) => {
 	let img_url = '';
@@ -65,8 +65,9 @@ const setImgAndColorByMode = (gameMode) => {
 };
 
 // Sử dụng webhook riêng cho từng account
-async function checkActiveGame(puuid) {
+const checkActiveGame = async (puuid) => {
 	try {
+		// get riotId
 		const user_response = await axios.get(
 			`https://asia.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
 			{
@@ -75,16 +76,111 @@ async function checkActiveGame(puuid) {
 		);
 		const userInfo = user_response.data;
 		const riotId = `${userInfo.gameName}#${userInfo.tagLine}`;
+
+		// get game data
 		const response = await axios.get(
 			`https://vn2.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${puuid}`,
 			{
 				headers: { 'X-Riot-Token': RIOT_API_KEY },
 			}
 		);
-		// Nếu có trận đấu, gửi thông báo đến Discord
 
 		if (response.status == 200) {
 			const gameInfo = response.data;
+			const matchId = gameInfo.gameId;
+
+			// Khởi tạo thông tin trận đấu nếu chưa có
+			if (!activeMatches[matchId]) {
+				activeMatches[matchId] = {
+					gameInfo: gameInfo,
+					players: new Set(),
+					notified: false, // flag để kiểm tra đã thông báo chưa
+				};
+			}
+
+			// Thêm người chơi vào trận đấu
+			activeMatches[matchId].players.add({
+				puuid: puuid,
+				riotId: riotId,
+			});
+
+			const now = moment().format('MMM d YYYY, HH:mm:ss');
+			console.log(clc.green(`${now} --- ${riotId} in game ${matchId}`));
+		}
+	} catch (error) {
+		// Xử lý khi không tìm thấy game active (404)
+		if (error.response && error.response.status == 404) {
+			// Xóa người chơi khỏi các trận đang theo dõi
+			for (let matchId in activeMatches) {
+				const match = activeMatches[matchId];
+				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
+				if (playerToRemove) {
+					match.players.delete(playerToRemove);
+
+					// Nếu không còn ai trong trận
+					if (match.players.size === 0) {
+						await sendGameEndNotification(matchId, playerToRemove.riotId);
+						delete activeMatches[matchId];
+					}
+				}
+			}
+		} else if (error.response && error.response.status == 403) {
+			if (!hasError403) {
+				hasError403 = true;
+				const warningMessage = {
+					content:
+						'⚠️ **CẢNH BÁO**: Riot API key đã hết hạn!\nVui lòng tạo key mới tại: https://developer.riotgames.com/',
+				};
+				await axios.post(NOTI_WEBHOOK_URL, warningMessage);
+
+				// log
+				const now = moment().format('MMM d YYYY, HH:mm:ss');
+				console.error(clc.red(`${now} --- API key đã hết hạn!`));
+
+				// Dừng chương trình
+				process.exit(1);
+			}
+			return;
+		} else {
+			const now = moment().format('MMM d YYYY, HH:mm:ss');
+			console.error(clc.red(`${now} --- Error for ${riotId}:`, error.message));
+		}
+	}
+};
+
+// Hàm mới để gửi thông báo game kết thúc
+const sendGameEndNotification = async (matchId, riotId) => {
+	const timestamp = new Date().toISOString();
+	await sendDiscordMessage({
+		embeds: [
+			{
+				title: `${riotId}`,
+				description: `GameID: ${matchId}`,
+				color: 6381921,
+				fields: [
+					{
+						name: '<:aukey:847123822003879956> Game has ended!:',
+						value: '',
+						inline: false,
+					},
+				],
+				timestamp: timestamp,
+			},
+		],
+	});
+};
+
+const sendNewGameNotifications = async () => {
+	for (let matchId in activeMatches) {
+		const match = activeMatches[matchId];
+
+		// Chỉ gửi thông báo cho các trận chưa được thông báo
+		if (!match.notified) {
+			const gameInfo = match.gameInfo;
+			const track_players = Array.from(match.players);
+
+			// Tạo danh sách người chơi đang theo dõi
+			const watchedPlayers = track_players.map((p) => p.riotId).join('\n');
 
 			// get queue data
 			const queueInfo = getQueueData(gameInfo.gameQueueConfigId);
@@ -122,7 +218,7 @@ async function checkActiveGame(puuid) {
 			const data = {
 				embeds: [
 					{
-						title: `${riotId}`,
+						title: `${watchedPlayers}`,
 						description: `• GameID: ${gameInfo.gameId}\n• Mode: ${gameInfo.gameMode}\n• Type: ${queueType}\n• Map: ${queueMap}`,
 						color: color,
 						footer: {
@@ -145,90 +241,21 @@ async function checkActiveGame(puuid) {
 				content: '',
 			};
 
-			// match id
-			const matchId = gameInfo.gameId;
-			if (matchId) {
-				// if new match
-				if (!activeMatches[matchId]) {
-					activeMatches[matchId] = new Set();
-					await sendDiscordMessage(data);
-				}
-				// add player to match
-				activeMatches[matchId].add(puuid);
-			}
-
-			// Log
-			const now = moment().format('MMM d YYYY, HH:mm:ss');
-			console.log(clc.green(`${now} --- ${riotId} in game`));
-		}
-	} catch (error) {
-		if (error.response && error.response.status == 404) {
-			const user_response = await axios.get(
-				`https://asia.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
-				{
-					headers: { 'X-Riot-Token': RIOT_API_KEY },
-				}
-			);
-			const userInfo = user_response.data;
-			const riotId = `${userInfo.gameName}#${userInfo.tagLine}`;
-			for (let matchId in activeMatches) {
-				if (activeMatches[matchId].has(puuid)) {
-					activeMatches[matchId].delete(puuid);
-					// Nếu không còn ai trong trận, xóa luôn matchId khỏi activeMatches
-					const timestamp = new Date().toISOString();
-					if (activeMatches[matchId].size === 0) {
-						await sendDiscordMessage({
-							embeds: [
-								{
-									title: `${riotId}`,
-									description: `GameID: ${matchId}`,
-									color: 6381921,
-									fields: [
-										{
-											name: '<:aukey:847123822003879956> Game has ended!:',
-											value: '',
-											inline: false,
-										},
-									],
-									timestamp: timestamp,
-								},
-							],
-						});
-						delete activeMatches[matchId];
-					}
-				}
-			}
-		} else if (error.response && error.response.status == 403) {
-			if (!hasError403) {
-				hasError403 = true;
-				const warningMessage = {
-					content:
-						'⚠️ **CẢNH BÁO**: Riot API key đã hết hạn!\nVui lòng tạo key mới tại: https://developer.riotgames.com/',
-				};
-				await axios.post(NOTI_WEBHOOK_URL, warningMessage);
-
-				// log
-				const now = moment().format('MMM d YYYY, HH:mm:ss');
-				console.error(clc.red(`${now} --- API key đã hết hạn!`));
-
-				// Dừng chương trình
-				process.exit(1);
-			}
-			return;
-		} else {
-			const now = moment().format('MMM d YYYY, HH:mm:ss');
-			console.error(clc.red(`${now} --- Error for ${riotId}:`, error.message));
+			await sendDiscordMessage(data);
+			match.notified = true;
 		}
 	}
-}
+};
 
 // Check all
-const checkAllAccounts = () => {
-	PUUIDS.forEach((puuid, index) => {
-		setTimeout(async () => {
-			await checkActiveGame(puuid);
-		}, index * 1000);
-	});
+const checkAllAccounts = async () => {
+	// Kiểm tra tất cả tài khoản
+	for (const puuid of PUUIDS) {
+		await checkActiveGame(puuid);
+	}
+
+	// Sau khi kiểm tra xong tất cả, gửi thông báo cho các trận mới
+	await sendNewGameNotifications();
 };
 
 //  Lập lịch kiểm tra mỗi 2 phút
