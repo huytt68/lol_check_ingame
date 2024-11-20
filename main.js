@@ -89,6 +89,24 @@ const checkActiveGame = async (puuid) => {
 			const gameInfo = response.data;
 			const matchId = gameInfo.gameId;
 
+			// Xóa các trận đấu cũ của người chơi này
+			for (let oldMatchId in activeMatches) {
+				const match = activeMatches[oldMatchId];
+				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
+				if (playerToRemove && oldMatchId !== matchId) {
+					// Tạo chuỗi riotId cho thông báo
+					const riotIds = Array.from(match.players)
+						.map((p) => p.riotId)
+						.join('\n');
+
+					// Gửi thông báo kết thúc trận đấu
+					await sendGameEndNotification(oldMatchId, riotIds);
+
+					// Xóa trận đấu cũ
+					delete activeMatches[oldMatchId];
+				}
+			}
+
 			// Khởi tạo thông tin trận đấu nếu chưa có
 			if (!activeMatches[matchId]) {
 				activeMatches[matchId] = {
@@ -115,13 +133,16 @@ const checkActiveGame = async (puuid) => {
 				const match = activeMatches[matchId];
 				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
 				if (playerToRemove) {
-					match.players.delete(playerToRemove);
+					// Tạo chuỗi riotId cho thông báo
+					const riotIds = Array.from(match.players)
+						.map((p) => p.riotId)
+						.join('\n');
 
-					// Nếu không còn ai trong trận
-					if (match.players.size === 0) {
-						await sendGameEndNotification(matchId, playerToRemove.riotId);
-						delete activeMatches[matchId];
-					}
+					// Gửi thông báo kết thúc trận đấu
+					await sendGameEndNotification(matchId, riotIds);
+
+					// Xóa trận đấu cũ
+					delete activeMatches[matchId];
 				}
 			}
 		} else if (error.response && error.response.status == 403) {
