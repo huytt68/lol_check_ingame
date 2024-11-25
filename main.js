@@ -114,13 +114,12 @@ const checkActiveGame = async (puuid) => {
 					players: new Set(),
 					notified: false, // flag để kiểm tra đã thông báo chưa
 				};
+				// Thêm người chơi vào trận đấu
+				activeMatches[matchId].players.add({
+					puuid: puuid,
+					riotId: riotId,
+				});
 			}
-
-			// Thêm người chơi vào trận đấu
-			activeMatches[matchId].players.add({
-				puuid: puuid,
-				riotId: riotId,
-			});
 
 			const now = moment().format('MMM d YYYY, HH:mm:ss');
 			console.log(clc.green(`${now} --- ${riotId} in game ${matchId}`));
