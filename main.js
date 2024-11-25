@@ -93,7 +93,7 @@ const checkActiveGame = async (puuid) => {
 			for (let oldMatchId in activeMatches) {
 				const match = activeMatches[oldMatchId];
 				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
-				if (playerToRemove && oldMatchId !== matchId) {
+				if (playerToRemove && !activeMatches[matchId]) {
 					// Tạo chuỗi riotId cho thông báo
 					const riotIds = Array.from(match.players)
 						.map((p) => p.riotId)
@@ -106,6 +106,7 @@ const checkActiveGame = async (puuid) => {
 					delete activeMatches[oldMatchId];
 				}
 			}
+
 			// Khởi tạo thông tin trận đấu nếu chưa có
 			if (!activeMatches[matchId]) {
 				activeMatches[matchId] = {
@@ -132,7 +133,6 @@ const checkActiveGame = async (puuid) => {
 				const match = activeMatches[matchId];
 				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
 				if (playerToRemove) {
-
 					// Tạo chuỗi riotId cho thông báo
 					const riotIds = Array.from(match.players)
 						.map((p) => p.riotId)
@@ -143,7 +143,6 @@ const checkActiveGame = async (puuid) => {
 
 					// Xóa trận đấu cũ
 					delete activeMatches[matchId];
-
 				}
 			}
 		} else if (error.response && error.response.status == 403) {
