@@ -163,7 +163,7 @@ const checkActiveGame = async (puuid) => {
 			return;
 		} else {
 			const now = moment().format('MMM d YYYY, HH:mm:ss');
-			console.error(clc.red(`${now} --- Error for ${riotId}:`, error.message));
+			console.error(clc.red(`${now} --- Error:`, error.message));
 		}
 	}
 };

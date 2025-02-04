@@ -1114,6 +1114,13 @@ module.exports = [
 		roles: ['fighter', 'assassin'],
 	},
 	{
+		id: 800,
+		name: 'Mel',
+		alias: 'Mel',
+		squarePortraitPath: '/lol-game-data/assets/v1/champion-icons/800.png',
+		roles: ['mage', 'support'],
+	},
+	{
 		id: 875,
 		name: 'Sett',
 		alias: 'Sett',
