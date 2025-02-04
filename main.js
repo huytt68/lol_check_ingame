@@ -51,7 +51,7 @@ const setImgAndColorByMode = (gameMode) => {
 		img_url =
 			'https://support-leagueoflegends.riotgames.com/hc/article_attachments/7395520405011/ultimate-spellbook-icon.png';
 		color = '65531';
-	} else if (gameMode == 'CLASSIC') {
+	} else if (gameMode == 'CLASSIC' || gameMode == 'URF') {
 		img_url =
 			'https://static.wikia.nocookie.net/leagueoflegends/images/0/04/Summoner%27s_Rift_Minimap.png';
 		color = '2883328';
@@ -236,31 +236,28 @@ const sendNewGameNotifications = async () => {
 			const { img_url, color } = setImgAndColorByMode(gameInfo.gameMode);
 			const timestamp = new Date().toISOString();
 			const data = {
+				content: null,
 				embeds: [
 					{
 						title: `${watchedPlayers}`,
 						description: `• GameID: ${gameInfo.gameId}\n• Mode: ${gameInfo.gameMode}\n• Type: ${queueType}\n• Map: ${queueMap}`,
 						color: color,
-						footer: {
-							text: `${startTime} - Ingame: ${gameLenFormatted}`,
-							icon_url: 'https://cdn-icons-png.flaticon.com/512/8327/8327677.png',
-						},
-						author: {
-							name: '',
-						},
 						fields: [
 							{ name: 'Team 1:', value: players_blue, inline: true },
 							{ name: 'Team 2:', value: players_red, inline: true },
 						],
+						footer: {
+							text: `${startTime} - Ingame: ${gameLenFormatted}`,
+							icon_url: 'https://cdn-icons-png.flaticon.com/512/8327/8327677.png',
+						},
 						timestamp: timestamp,
 						thumbnail: {
 							url: img_url,
 						},
 					},
 				],
-				content: '',
+				attachments: [],
 			};
-
 			await sendDiscordMessage(data);
 			match.notified = true;
 		}
