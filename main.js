@@ -127,7 +127,6 @@ const checkActiveGame = async (puuid) => {
 
 			const now = moment().format('MMM d YYYY, HH:mm:ss');
 			console.log(clc.green(`${now} --- ${riotId} in game ${matchId}`));
-			console.log(clc.blue(`${now} --- Game Info:`, JSON.stringify(gameInfo, null, 2)));
 		}
 	} catch (error) {
 		// Xử lý khi không tìm thấy game active (404)
@@ -166,9 +165,29 @@ const checkActiveGame = async (puuid) => {
 				process.exit(1);
 			}
 			return;
+		} else if (error.response && error.response.status == 400) {
+			// Xử lý lỗi 400 Bad Request
+			const now = moment().format('MMM d YYYY, HH:mm:ss');
+			console.error(clc.red(`${now} --- Lỗi 400 Bad Request khi kiểm tra PUUID: ${puuid}`));
+			console.error(
+				clc.yellow(
+					`Chi tiết lỗi: ${
+						error.response.data ? JSON.stringify(error.response.data) : error.message
+					}`
+				)
+			);
+			// Không dừng chương trình, chỉ bỏ qua PUUID này
+			return;
 		} else {
 			const now = moment().format('MMM d YYYY, HH:mm:ss');
 			console.error(clc.red(`${now} --- Error:`, error.message));
+			if (error.response) {
+				console.error(
+					clc.yellow(
+						`Status: ${error.response.status}, Data: ${JSON.stringify(error.response.data || {})}`
+					)
+				);
+			}
 		}
 	}
 };
