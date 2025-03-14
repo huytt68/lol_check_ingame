@@ -23,6 +23,7 @@ const PUUIDS = [
 	'SEmrr51edIxdP0jKYh06wSG5oT1tTBs8Gu-YRWvLVVBDNANEd4Hn5OE_Q4wnqpvdkJZkAYuiCDF6Gw', //Long
 	'-W501c8FUJByT6vwR4NcUBm0SdEVMMqLo84pS7Vqb-Ydh3y4gucm7FvD4ZLaRX2mozEi3Ra7R4pOUg', //Manh
 	'vlJzxNCdhjYDvadtKmAXh-O9-4N5IE-KP6ItgkPkHAffnGb6NP17loR-b5VJHgjejtqlZCArJC_PpQ', //cutu
+	'TzfJzBxZn943qcX8yvdYZvYvlx2L71HBUal6wojrNL7JQu2dF_rJMkPe_ymJRZ2e5DF1O0MXT5-YDg', //huytt
 ];
 let activeMatches = {};
 let hasError403 = false;
@@ -59,6 +60,9 @@ const setImgAndColorByMode = (gameMode) => {
 		img_url =
 			'https://static.wikia.nocookie.net/leagueoflegends/images/0/07/Howling_Abyss_Minimap.png';
 		color = '31743';
+	} else if (gameMode == 'CHERRY') {
+		img_url = 'https://blitz-cdn.blitz.gg//blitz/lol/arena/gladiator-medallion.webp';
+		color = '16258839';
 	}
 
 	return { img_url: img_url, color: color };
@@ -123,6 +127,7 @@ const checkActiveGame = async (puuid) => {
 
 			const now = moment().format('MMM d YYYY, HH:mm:ss');
 			console.log(clc.green(`${now} --- ${riotId} in game ${matchId}`));
+			console.log(clc.blue(`${now} --- Game Info:`, JSON.stringify(gameInfo, null, 2)));
 		}
 	} catch (error) {
 		// Xử lý khi không tìm thấy game active (404)
@@ -208,20 +213,71 @@ const sendNewGameNotifications = async () => {
 			const queueType = queueInfo.description;
 			// get list players
 			const players = gameInfo.participants;
-			const players_blue = players.slice(0, 5).reduce((string, p) => {
-				const championInfo = getChampionInfo(p.championId);
-				if (championInfo) {
-					return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+
+			let fields = [];
+			if (gameInfo.gameMode === 'CHERRY') {
+				// Xử lý cho chế độ CHERRY - 8 team, mỗi team 2 người
+				// Chia thành 4 dòng, mỗi dòng 2 team
+				for (let i = 0; i < 4; i++) {
+					const team1Players = players.slice(i * 4, i * 4 + 2);
+					const team2Players = players.slice(i * 4 + 2, i * 4 + 4);
+
+					const team1Info = team1Players.reduce((string, p) => {
+						const championInfo = getChampionInfo(p.championId);
+						if (championInfo) {
+							return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+						}
+						return string;
+					}, '');
+
+					const team2Info = team2Players.reduce((string, p) => {
+						const championInfo = getChampionInfo(p.championId);
+						if (championInfo) {
+							return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+						}
+						return string;
+					}, '');
+
+					fields.push({
+						name: `Team ${i * 2 + 1}:`,
+						value: team1Info,
+						inline: true,
+					});
+					fields.push({
+						name: `Team ${i * 2 + 2}:`,
+						value: team2Info,
+						inline: true,
+					});
+
+					// Thêm field ngắt dòng (không inline) sau mỗi cặp team
+					// Field này sẽ không hiển thị nội dung nhưng sẽ buộc Discord xuống dòng mới
+					fields.push({
+						name: '\u200b',
+						value: '\u200b',
+						inline: false,
+					});
 				}
-				return string;
-			}, '');
-			const players_red = players.slice(5, players.length).reduce((string, p) => {
-				const championInfo = getChampionInfo(p.championId);
-				if (championInfo) {
-					return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
-				}
-				return string;
-			}, '');
+			} else {
+				// Xử lý cho các chế độ khác - 2 team
+				const players_blue = players.slice(0, 5).reduce((string, p) => {
+					const championInfo = getChampionInfo(p.championId);
+					if (championInfo) {
+						return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+					}
+					return string;
+				}, '');
+				const players_red = players.slice(5, players.length).reduce((string, p) => {
+					const championInfo = getChampionInfo(p.championId);
+					if (championInfo) {
+						return string + '• ' + championInfo.name + ' - ' + p.riotId + '\n';
+					}
+					return string;
+				}, '');
+				fields = [
+					{ name: 'Team 1:', value: players_blue, inline: true },
+					{ name: 'Team 2:', value: players_red, inline: true },
+				];
+			}
 
 			const gameLenMinutes = Math.floor(gameInfo.gameLength / 60);
 			const gameLenSeconds = gameInfo.gameLength % 60;
@@ -242,10 +298,7 @@ const sendNewGameNotifications = async () => {
 						title: `${watchedPlayers}`,
 						description: `• GameID: ${gameInfo.gameId}\n• Mode: ${gameInfo.gameMode}\n• Type: ${queueType}\n• Map: ${queueMap}`,
 						color: color,
-						fields: [
-							{ name: 'Team 1:', value: players_blue, inline: true },
-							{ name: 'Team 2:', value: players_red, inline: true },
-						],
+						fields: fields,
 						footer: {
 							text: `${startTime} - Ingame: ${gameLenFormatted}`,
 							icon_url: 'https://cdn-icons-png.flaticon.com/512/8327/8327677.png',
