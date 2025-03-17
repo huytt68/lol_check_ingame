@@ -349,7 +349,7 @@ const checkAllAccounts = async () => {
 
 //  Lập lịch kiểm tra mỗi 2 phút
 cron.schedule('*/2 * * * *', () => {
-	const now = moment().format('MMM d YYYY, HH:mm:ss');
+	const now = moment().tz('Asia/Ho_Chi_Minh').format('MMM D YYYY, HH:mm:ss');
 	console.log(`~~~~~~~~~~~ ${now} ~~~~~~~~~~`);
 	checkAllAccounts();
 });
