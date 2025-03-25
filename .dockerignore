@@ -1,7 +1,7 @@
 # Logs
 logs
 *.log
-npm-debug.log*
+npm-debug.log
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
@@ -128,3 +128,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Additional files to remove
+.git
+.gitignore
+README.md
+.vscode

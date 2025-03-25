@@ -1,39 +1,30 @@
 # syntax = docker/dockerfile:1
 
-# Adjust NODE_VERSION as desired
-ARG NODE_VERSION=20.18.0
-FROM node:${NODE_VERSION}-slim as base
+# Sử dụng Node.js LTS version
+FROM node:20-slim
 
-LABEL fly_launch_runtime="Node.js"
-
-# Node.js app lives here
+# Tạo thư mục làm việc
 WORKDIR /app
 
-# Set production environment
-ENV NODE_ENV="production"
+# Cài đặt các package cần thiết
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
 
+# Copy package.json và package-lock.json
+COPY package*.json ./
 
-# Throw-away build stage to reduce size of final image
-FROM base as build
+# Cài đặt dependencies và concurrently
+RUN npm install && \
+    npm install -g concurrently
 
-# Install packages needed to build node modules
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
-
-# Install node modules
-COPY package-lock.json package.json ./
-RUN npm ci
-
-# Copy application code
+# Copy toàn bộ source code
 COPY . .
 
-
-# Final stage for app image
-FROM base
-
-# Copy built application
-COPY --from=build /app /app
-
-# Start the server by default, this can be overwritten at runtime
+# Expose port nếu cần
 EXPOSE 3000
-CMD [ "npm", "run", "start" ]
+
+# Chạy ứng dụng
+CMD ["npm", "start"]
