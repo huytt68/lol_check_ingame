@@ -6,7 +6,7 @@ require('dotenv').config();
 const { PUUIDS } = require('./config.js');
 const {
 	sendDiscordMessage,
-	sendGameEndNotification,
+	sendTFTGameEndNotification,
 	formatGameTime,
 	formatStartTime,
 	getCurrentTime,
@@ -42,36 +42,36 @@ const checkActiveGame = async (puuid) => {
 
 		if (response.status == 200) {
 			const gameInfo = response.data;
-			const matchId = gameInfo.gameId;
+			const gameId = gameInfo.gameId;
 
 			// Xóa các trận đấu cũ của người chơi này
-			for (let oldMatchId in activeMatches) {
-				const match = activeMatches[oldMatchId];
+			for (let oldGameId in activeMatches) {
+				const match = activeMatches[oldGameId];
 				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
-				if (playerToRemove && !activeMatches[matchId]) {
+				if (playerToRemove && !activeMatches[gameId]) {
 					const riotIds = Array.from(match.players)
 						.map((p) => p.riotId)
 						.join('\n');
 
-					await sendGameEndNotification(TFT_WEBHOOK_URL, oldMatchId, riotIds);
-					delete activeMatches[oldMatchId];
+					await sendTFTGameEndNotification(TFT_WEBHOOK_URL, oldGameId, riotIds);
+					delete activeMatches[oldGameId];
 				}
 			}
 
 			// Khởi tạo thông tin trận đấu nếu chưa có
-			if (!activeMatches[matchId]) {
-				activeMatches[matchId] = {
+			if (!activeMatches[gameId]) {
+				activeMatches[gameId] = {
 					gameInfo: gameInfo,
 					players: new Set(),
 					notified: false,
 				};
-				activeMatches[matchId].players.add({
+				activeMatches[gameId].players.add({
 					puuid: puuid,
 					riotId: riotId,
 				});
 			}
 
-			console.log(clc.yellow(`${getCurrentTime()} --- ${riotId} in TFT game ${matchId}`));
+			console.log(clc.yellow(`${getCurrentTime()} --- ${riotId} in TFT game ${gameId}`));
 		}
 	} catch (error) {
 		const { shouldContinue, hasError403: newHasError403 } = await handleApiError(
@@ -84,16 +84,16 @@ const checkActiveGame = async (puuid) => {
 
 		if (shouldContinue) {
 			// Xóa người chơi khỏi các trận đang theo dõi
-			for (let matchId in activeMatches) {
-				const match = activeMatches[matchId];
+			for (let gameId in activeMatches) {
+				const match = activeMatches[gameId];
 				const playerToRemove = Array.from(match.players).find((p) => p.puuid === puuid);
 				if (playerToRemove) {
 					const riotIds = Array.from(match.players)
 						.map((p) => p.riotId)
 						.join('\n');
 
-					await sendGameEndNotification(TFT_WEBHOOK_URL, matchId, riotIds);
-					delete activeMatches[matchId];
+					await sendTFTGameEndNotification(TFT_WEBHOOK_URL, gameId, riotIds);
+					delete activeMatches[gameId];
 				}
 			}
 		}
